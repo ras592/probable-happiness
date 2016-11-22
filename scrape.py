@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup
+#from bs4 import BeautifulSoup
 from urllib import urlopen
 import pickle
 import os
@@ -183,7 +183,27 @@ def scrape_player_data():
     save_data(nfl_players, nfl_players_path)
 
 
-def import_data():
+def import_data(testing):
+    if testing:
+        return ({
+                "qb": ['Tom Brady', 'Peyton Manning'],
+                "rb": ['DeMarco Murray', 'Melvin Gordon', 'David Johnson', 'LeGarrette Blount'],
+                "wr": ['Julio Jones', 'Mike Evans', 'Antonio Brown', 'A.J. Green',
+                       'Jordy Nelson', 'T.Y. Hilton'],
+                "te": ['Rob Gronkowski', 'Jimmy Graham', 'Kyle Rudolph'],
+                "k": ['Matt Bryant', 'Adam Vinatieri', 'Justin Tucker', 'Dustin Hopkins']
+                }, {
+                "qb": {"Tom Brady": {"team": "ne"}, "Peyton Manning": {"team": "ind"}},
+                "rb": {'DeMarco Murray': {"team": "ten"}, 'Melvin Gordon': {"team": "sd"},
+                    'David Johnson': {"team": "ari"}, 'LeGarrette Blount': {"team": "ne"}},
+                "wr": {'Julio Jones': {"team": "atl"}, 'Mike Evans': {"team": "tb"},
+                    'Antonio Brown': {"team": "pit"}, 'A.J. Green': {"team": "cin"},
+                    'Jordy Nelson': {"team": "gb"}, 'T.Y. Hilton': {"team": "ind"}},
+                "te": {'Rob Gronkowski': {"team": "ne"}, 'Jimmy Graham': {"team": "no"},
+                    'Kyle Rudolph': {"team": "min"}},
+                "k": {'Matt Bryant': {"team": "atl"}, 'Adam Vinatieri': {"team": "ind"},
+                    'Justin Tucker': {"team": "bal"}, 'Dustin Hopkins': {"team": "wsh"}}
+                })
     try:
         if os.path.isfile(os.path.join('.', object_dirname, nfl_players_path + '.pkl')) and \
            os.path.isfile(os.path.join('.', object_dirname, nfl_players_info_path + '.pkl')):
@@ -191,6 +211,8 @@ def import_data():
         else:
             cmd = raw_input("Data files not found... scrape data(y/n)")
             if cmd.strip().lower() == 'y':
+                print "Trying to import bs4..."
+                from bs4 import BeautifulSoup
                 scrape_player_data()
                 import_data()
             else:
@@ -202,11 +224,16 @@ def import_data():
                         "te": ['Rob Gronkowski', 'Jimmy Graham', 'Kyle Rudolph'],
                         "k": ['Matt Bryant', 'Adam Vinatieri', 'Justin Tucker', 'Dustin Hopkins']
                         }, {
-                        "qb": {},
-                        "rb": {},
-                        "wr": {},
-                        "te": {},
-                        "k": {}
+                        "qb": {"Tom Brady": {"team": "ne"}, "Peyton Manning": {"team": "ind"}},
+                        "rb": {'DeMarco Murray': {"team": "ten"}, 'Melvin Gordon': {"team": "sd"},
+                            'David Johnson': {"team": "ari"}, 'LeGarrette Blount': {"team": "ne"}},
+                        "wr": {'Julio Jones': {"team": "atl"}, 'Mike Evans': {"team": "tb"},
+                            'Antonio Brown': {"team": "pit"}, 'A.J. Green': {"team": "cin"},
+                            'Jordy Nelson': {"team": "gb"}, 'T.Y. Hilton': {"team": "ind"}},
+                        "te": {'Rob Gronkowski': {"team": "ne"}, 'Jimmy Graham': {"team": "no"},
+                            'Kyle Rudolph': {"team": "min"}},
+                        "k": {'Matt Bryant': {"team": "atl"}, 'Adam Vinatieri': {"team": "ind"},
+                            'Justin Tucker': {"team": "bal"}, 'Dustin Hopkins': {"team": "wsh"}}
                         })
     except Exception as e:
         print "An error has occurred. {}".format(e.message)

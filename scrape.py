@@ -13,6 +13,7 @@ nfl_players_info_path = 'nfl_players_info'
 url_prefix, url_postfix, url_prefix_2015, positions, player_table_class, player_row_class, \
     player_name_class, player_stats_class = import_vars()
 
+BeautifulSoup = None
 
 def save_data(obj, data_path):
     """
@@ -61,7 +62,7 @@ def to_player_dict(player):
     # players column
     player_name_list = player.find('td', {'class': player_name_class}).get_text().split(',')
     player_name = player_name_list[0]
-    player_team, player_position = player_name_list[1].split(' ')
+    _, player_team, player_position = player_name_list[1].replace(u'\xa0', u' ').split(u' ')
 
     print "scraping {}...".format(player_name)
 
@@ -253,7 +254,10 @@ def import_data(testing):
 
 
 def main():
+    global BeautifulSoup
     try:
+        from bs4 import BeautifulSoup as beautifulsoup
+        BeautifulSoup = beautifulsoup
         scrape_player_data()
     except Exception as e:
         print "An error has occurred. {}".format(e.message)

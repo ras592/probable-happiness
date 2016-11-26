@@ -6,6 +6,11 @@ from scrape import import_data
 from itertools import combinations
 
 NFL_WEEKS = 13
+MAX_ROSTER_NUMBER = 12
+# An active team of 12 maxes around 2900 points per season,
+# therefore the goal value was estimated at 2700 due to bye
+# weeks. This value can be tweaked.
+GOAL_ROSTER_VALUE = 2700
 ACTIVE_POSITIONS = ["qb", "rb1", "rb2", "wr1", "wr2", "wr3", "te", "k"]
 category = {
     "qb": "qb",
@@ -29,7 +34,7 @@ team_bye_weeks = [ [], [], [], [],
     [],
     ["cle", "ten"]
 ]
-nfl_players, nfl_players_info = import_data(False) # true from smaller data set
+nfl_players, nfl_players_info = import_data(False) # true for smaller data set
 
 def check_tuples(tail, head):
     """ Checks if tail (player name) exists anywhere in head (list of tuples).
@@ -81,7 +86,42 @@ def create_position_possibilities(position):
     return valid_possibilities
 
 def filter_bye_weeks(nfl_players, week, position):
+    """Returns a filtered list of players for a particular position for a given week. Satisfies bye week
+    unary constraint.
+
+    :param nfl_players: list of nfl players for a position.
+    :param week: which week as an int
+    :param position: player position being checked for.
+    :return: a list of nfl players for a given position for that week.
+    """
     return filter(lambda x: nfl_players_info[position][x]["team"].lower() not in team_bye_weeks[week], nfl_players)
+
+def calculate_unique_players(features):
+    """Returns the int value of how many unique players there are in the csp graph.
+
+    :param features: Players features in the csp graph.
+    :return: int value of how many unique players.
+    """
+    unique = []
+    for feature in features:
+        if not feature.value in unique:
+            unique.append(feature.value)
+    return len(unique)
+
+def team_rank(features):
+    """Returns either 0 for a goal achieving roster rank or the absolute difference from the goal value.
+
+    :param features: Players features in the csp graph.
+    :return: int value of team strength where 0 is preferred.
+    """
+    ranks = []
+    for feature in features:
+        ranks.append(nfl_players_info[feature.name.split(',')[2]][feature.value]["total_points"]) # grab each player rank
+    total_points = reduce(lambda a, x: a + x, ranks) # calculate the sum of the ranks list
+    if total_points >= GOAL_ROSTER_VALUE: # if it achieves a sufficient goal value return 0 the preferred value
+        return 0
+    else:
+        return abs(total_points - GOAL_ROSTER_VALUE) # a below par ranking will return how far away it is from the goal value
 
 class CSPGraphFantasyFootball(CSPGraph):
     def __init__(self):
@@ -101,6 +141,22 @@ class CSPGraphFantasyFootball(CSPGraph):
             # if the constraint is satisfied, then increase the count
             if (not constraint.satisfied(constraint.tail.value, constraint.head.value)):
                 ofValue += 1
+
+        features = [] # list to hold all the features
+
+        # get all the features from the csp graph
+        for week in range(1, NFL_WEEKS + 1):
+            for position in ACTIVE_POSITIONS:
+                features.append(self.getFeature("{0},{1},{2}".format(week, position, category[position])))
+
+        # max player num
+        unique_players = calculate_unique_players(features)
+        if unique_players > MAX_ROSTER_NUMBER:
+            ofValue += abs(unique_players - MAX_ROSTER_NUMBER) # add to objective function when team is too big
+
+        # player rank
+        ofValue += team_rank(features) # add to objective function when team is subpar
+
         # return the count of satisfied constraints
         return ofValue
 
@@ -150,6 +206,29 @@ class CSPConstraintOnePlayerPerPosition(CSPConstraint):
         # then the constraint is satisfied
 
         if _tailValue != _headValue:
+            return True
+        # otherwise, they have the same value so the constraint is not satisfied
+        return False
+
+class CSPConstraintPlayersNotFromSameTeam(CSPConstraint):
+    def __init__(self, _ftrTail, _ftrHead):
+        # call the parent constructor
+        CSPConstraint.__init__(self, _ftrTail, '!=', _ftrHead)
+
+    def satisfied(self, _tailValue, _headValue):
+        """A player cannot play multiple active positions a week.
+
+        :param _tailValue: the player name for one position in one week (e.g. Week 1 RB1)
+        :param _headValue: another player name for one position in the same week (e.g. Week 1 RB2)
+        """
+        # if the head or the tail haven't been assigned, then the constraint is satisfied
+        if _headValue is None or _tailValue is None:
+            return True
+        # if both the head and the tail have been assigned and they have different values
+        # then the constraint is satisfied
+
+        if nfl_players_info[self.tail.name.split(',')[2]][_tailValue]["team"].lower() != \
+            nfl_players_info[self.head.name.split(',')[2]][_headValue]["team"].lower():
             return True
         # otherwise, they have the same value so the constraint is not satisfied
         return False
@@ -209,11 +288,6 @@ def FantasyFootball():
     #
 
     # max players in weeks
-
-    """
-    REDO FOR TAIL VALUES TO BE REMOVED!
-    """
-
     for position in ACTIVE_POSITIONS:
         for week in range(1, NFL_WEEKS + 1):
             feature = "{0},{1},{2}".format(week, position, category[position])
@@ -253,6 +327,26 @@ def FantasyFootball():
         cspGraph.addConstraint(CSPConstraintOnePlayerPerPosition(
                 cspGraph.getFeature(featureWR3),
                 cspGraph.getFeature(featureWR2))) # wr3 != wr2
+
+    #
+    # players cannot be from the same team
+    #
+    for week in range(1, NFL_WEEKS + 1):
+        featureQB = "{0},{1},{2}".format(week, "qb", "qb")
+        featureRB1 = "{0},{1},{2}".format(week, "rb1", "rb")
+        featureRB2 = "{0},{1},{2}".format(week, "rb2", "rb")
+        featureWR1 = "{0},{1},{2}".format(week, "wr1", "wr")
+        featureWR2 = "{0},{1},{2}".format(week, "wr2", "wr")
+        featureWR3 = "{0},{1},{2}".format(week, "wr3", "wr")
+        featureTE = "{0},{1},{2}".format(week, "te", "te")
+        featureK = "{0},{1},{2}".format(week, "k", "k")
+        constraint_list = list(combinations([featureQB, featureRB1, featureRB2, featureWR1, featureWR2, featureWR3, featureTE, featureK], 2))
+        for tup in constraint_list:
+            cspGraph.addConstraint(CSPConstraintPlayersNotFromSameTeam(
+                cspGraph.getFeature(tup[0]),
+                cspGraph.getFeature(tup[1]))) # wr3 != wr2
+
+
 
     # call hill climbing search
     hillClimbingSearch(cspGraph)
